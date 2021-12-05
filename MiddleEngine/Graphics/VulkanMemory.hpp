@@ -8,17 +8,19 @@ struct Vertex {
     glm::vec3 color;
     glm::vec2 texCoord;
 
-    static VkVertexInputBindingDescription getBindingDescription() {
+    static std::vector<VkVertexInputBindingDescription> getBindingDescription() {
+        std::vector<VkVertexInputBindingDescription> BindingDescriptions(1);
+
         VkVertexInputBindingDescription bindingDescription{};
         bindingDescription.binding = 0;
         bindingDescription.stride = sizeof(Vertex);
         bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescription;
+        BindingDescriptions[0] = bindingDescription;
+        return BindingDescriptions;
     }
 
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
@@ -96,8 +98,8 @@ namespace VulkanMemory
     
     MDTexture CreateTexture(
         const char* filePath,
-        VkFilter minFilter = VK_FILTER_NEAREST,
-        VkFilter magFilter = VK_FILTER_NEAREST,
+        VkFilter minFilter = VK_FILTER_LINEAR,
+        VkFilter magFilter = VK_FILTER_LINEAR,
         VkSamplerAddressMode addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         VkSamplerAddressMode addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT);
 

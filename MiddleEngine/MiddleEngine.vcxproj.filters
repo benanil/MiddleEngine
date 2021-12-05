@@ -21,7 +21,7 @@
     <ClCompile Include="Graphics\VulkanBackend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\Shader.cpp">
+    <ClCompile Include="Graphics\Pipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Graphics\VulkanMemory.cpp">
@@ -32,7 +32,7 @@
     <ClInclude Include="Graphics\VulkanBackend.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Shader.hpp">
+    <ClInclude Include="Graphics\Pipeline.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Common.hpp">
@@ -42,6 +42,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\VulkanMemory.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\VulkanHelper.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
