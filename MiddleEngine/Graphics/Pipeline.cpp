@@ -102,8 +102,9 @@ namespace Rendering
             VK_FALSE, // depthClamp Enable 
             VK_FALSE, // rasterizer Discard Enable
             VK_POLYGON_MODE_FILL, // polygonMode
-            // VK_CULL_MODE_BACK_BIT, // cullMode
-            VK_CULL_MODE_FRONT_BIT,
+            VK_CULL_MODE_BACK_BIT, // cullMode
+            // VK_CULL_MODE_FRONT_AND_BACK,
+            // VK_CULL_MODE_FRONT_BIT,
             VK_FRONT_FACE_COUNTER_CLOCKWISE,
             VK_FALSE, // depthBiasEnable
             0, 0, 0, 1
@@ -129,12 +130,19 @@ namespace Rendering
         colorBlending.blendConstants[2] = 0.0f;
         colorBlending.blendConstants[3] = 0.0f;
 
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.stencilTestEnable = VK_FALSE;
+
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
         pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
         pipelineLayoutInfo.pushConstantRangeCount = 0;
-
 
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("PipelineLayout creation failed");
@@ -149,7 +157,7 @@ namespace Rendering
             &viewportState,
             &rasterizer,
             &multisampling,
-            nullptr, // depth stencil state
+            &depthStencil, // depth stencil state
             &colorBlending,
             nullptr, // dynamic state
             pipelineLayout,

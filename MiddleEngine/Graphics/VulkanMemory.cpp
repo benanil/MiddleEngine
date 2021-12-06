@@ -74,6 +74,8 @@ namespace VulkanMemory
         vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 
+    // BUFFER
+
     void CreateBuffer(
         const void* vertices,
         VkDeviceSize vertexCount,
@@ -133,6 +135,40 @@ namespace VulkanMemory
         endSingleTimeCommands(commandBuffer);
     }
     
+    void createBufferStage(
+        VkDeviceSize size, 
+        VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags properties, 
+        VkBuffer& buffer, 
+        VkDeviceMemory& bufferMemory) 
+    {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create buffer!");
+        }
+
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate buffer memory!");
+        }
+
+        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    }
+
+    // TEXTURE
+
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -166,8 +202,27 @@ namespace VulkanMemory
             sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
             destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
+        else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        }
         else {
             throw std::invalid_argument("unsupported layout transition!");
+        }
+
+
+        if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+            if (MD_HAS_STENCIL_FORMAT(format)) {
+                barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
+        }
+        else {
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         }
 
         vkCmdPipelineBarrier(
@@ -181,8 +236,6 @@ namespace VulkanMemory
 
         endSingleTimeCommands(commandBuffer);
     }
-
-
     void copyBufferToImage(VkBuffer buffer, MDTexture& texture) 
     {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
@@ -217,12 +270,13 @@ namespace VulkanMemory
         endSingleTimeCommands(commandBuffer);
     }
 
-    VkImageView createImageView(VkImage image, VkFormat format)
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
     {
-        return createImageView(device, image, format);
+        return createImageView(device, image, format, aspectFlags);
     }
 
-    VkImageView createImageView(VkDevice _device, VkImage image, VkFormat format) {
+    VkImageView createImageView(VkDevice _device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
+    {
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = image;
@@ -230,6 +284,7 @@ namespace VulkanMemory
         viewInfo.format = format;
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.aspectMask = aspectFlags;
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
@@ -244,39 +299,55 @@ namespace VulkanMemory
         return imageView;
     }
 
-    void createBufferStage(
-        VkDeviceSize size, 
-        VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties, 
-        VkBuffer& buffer, 
-        VkDeviceMemory& bufferMemory) 
+    void createImage(
+        MDImage& mdImage, 
+        VkFormat format, 
+        VkImageTiling tiling, 
+        VkImageUsageFlags usage, 
+        VkMemoryPropertyFlags properties) 
     {
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = size;
-        bufferInfo.usage = usage;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = mdImage.width;
+        imageInfo.extent.height = mdImage.height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = format;
+        imageInfo.tiling = tiling;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = usage;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create buffer!");
+        if (vkCreateImage(device, &imageInfo, nullptr, &mdImage.image) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create image!");
         }
 
         VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+        vkGetImageMemoryRequirements(device, mdImage.image, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate buffer memory!");
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &mdImage.memory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate image memory!");
         }
 
-        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+        vkBindImageMemory(device, mdImage.image, mdImage.memory, 0);
     }
 
-    void createImage(MDTexture& texture, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties)
+
+    void createImage(
+        MDTexture& texture, 
+        VkFormat format,
+        VkImageTiling tiling, 
+        VkImageUsageFlags usage, 
+        VkMemoryPropertyFlags properties)
     {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -313,7 +384,7 @@ namespace VulkanMemory
     }
 
     MDTexture CreateTexture(
-        const char* filePath,
+        const char** filePath,
         VkFilter minFilter,
         VkFilter magFilter,
         VkSamplerAddressMode addressModeU,
@@ -323,7 +394,7 @@ namespace VulkanMemory
         
         int channels = 0;
 
-        stbi_uc* pixels = stbi_load("../Assets/Textures/AtaTurk10.jpeg", &texture.width, &texture.height, &channels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load(*filePath, &texture.width, &texture.height, &channels, STBI_rgb_alpha);
         
         if (!pixels) { throw std::runtime_error("stbi failed to load texture image!"); }
 

@@ -9,6 +9,7 @@
 #include <Common.hpp>
 #include "Graphics/VulkanMemory.hpp"
 #include "VulkanHelper.hpp"
+#include "Mesh.h"
 
 #include <chrono>
 
@@ -90,6 +91,7 @@ namespace Rendering
     MDBuffer indexBuffer;
 
     MDTexture texture;
+    MDImage depthImage;
 
     std::vector<MDBuffer> uniformBuffers;
 
@@ -103,17 +105,6 @@ namespace Rendering
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
-    };
-
-    const std::vector<Vertex> vertices = {
-        {{-1.0f, -1.0f} , {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-        {{ 1.0f, -1.0f} , {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-        {{ 1.0f,  1.0f} , {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-        {{-1.0f,  1.0f} , {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
-    };
-
-    const std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0
     };
 
     void createDescriptorPool()
@@ -226,12 +217,10 @@ namespace Rendering
         // static auto startTime = std::chrono::high_resolution_clock::now();
 
         UniformBufferObject ubo{};
-        // (float)glfwGetTime()
-        ubo.model = glm::mat4(1.0f) * glm::scale(glm::vec3(2.0f, 2.0f, 2.0f));
-
-        ubo.view = glm::lookAt(glm::vec3(0.5f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+        // * glm::rotate((float)glfwGetTime(), glm::vec3(0,0,1)) 
+        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(glm::sin((float)glfwGetTime()) * 10), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::translate(glm::vec3(0, 0,-0.33f));
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(35.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 1000.0f);
 
         ubo.proj[1][1] *= -1;
 
@@ -251,19 +240,26 @@ namespace Rendering
         {
             VulkanMemory::CreateBuffer(malloc(sizeof(UniformBufferObject)), 1
                 , sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                MD_DEFAULT_BUFFER_PROPERTIES, MD_NONE_BIT, uniformBuffers[i]);
+                MD_DEFAULT_BUFFER_PROPERTIES, MD_BUFFER_NONE_BIT, uniformBuffers[i]);
         }
     }
+    
+    Mesh* meshes;
 
     void generate_vertex_index_buffers()
     {
+        spdlog::info("is mesh exist: {0}", std::filesystem::exists(MD_ASSETS_PATH("Models/sponza.obj")));
+
+        unsigned short meshCount = 0;
+        meshes = LoadMesh(MD_ASSETS_PATH("Models/viking room.obj"), meshCount);
+        
         // create vertex buffers
-        VulkanMemory::CreateBuffer(vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-            MD_DEFAULT_BUFFER_PROPERTIES , vertexBuffer);
+        VulkanMemory::CreateBuffer(meshes->vertices, (VkDeviceSize)meshes->vertexCount, sizeof(Vertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            MD_DEFAULT_BUFFER_PROPERTIES, MD_MAP_BIT, vertexBuffer);
         
         // create index buffers
-        VulkanMemory::CreateBuffer(indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
-            MD_DEFAULT_BUFFER_PROPERTIES, indexBuffer);
+        VulkanMemory::CreateBuffer(meshes->indices, (VkDeviceSize)meshes->indexCount, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+            MD_DEFAULT_BUFFER_PROPERTIES, MD_MAP_BIT, indexBuffer);
     
         // create uniform buffers
         createUniformBuffers();
@@ -414,9 +410,12 @@ namespace Rendering
                 renderPass, swapChainFramebuffers[i], VkRect2D({ 0, 0, swapChainExtent})
             };
 
-            VkClearValue clearColor = { 0.2f, 0.2f, 0.2f, 1.0f };
-            renderPassInfo.clearValueCount = 1;
-            renderPassInfo.pClearValues = &clearColor;
+            std::array<VkClearValue, 2> clearValues{};
+            clearValues[0].color = { {0.2f, 0.2f, 0.2f, 1.0f} };
+            clearValues[1].depthStencil = { 1.0f, 0 };
+
+            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            renderPassInfo.pClearValues = clearValues.data();
 
             vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -426,10 +425,10 @@ namespace Rendering
                 VkDeviceSize offsets[] = { 0 };
                 vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
-                vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                 vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-                vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+                vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(meshes->indexCount), 1, 0, 0, 0);
 
             vkCmdEndRenderPass(commandBuffers[i]);
 
@@ -455,19 +454,21 @@ namespace Rendering
     void createFramebuffers() {
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
-        for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-            VkImageView attachments[] = {
-                swapChainImageViews[i]
+        for (size_t i = 0; i < swapChainImageViews.size(); i++)
+        {
+            std::array<VkImageView, 2> attachments = {
+                swapChainImageViews[i],
+                depthImage.imageView
             };
 
-            VkFramebufferCreateInfo framebufferInfo {
-                VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0,
-                renderPass, 1,
-                attachments,
-                swapChainExtent.width,
-                swapChainExtent.height,
-                1 // layers
-            };
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.renderPass = renderPass;
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+            framebufferInfo.pAttachments = attachments.data();
+            framebufferInfo.width = swapChainExtent.width;
+            framebufferInfo.height = swapChainExtent.height;
+            framebufferInfo.layers = 1;
 
             if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create framebuffer!");
@@ -501,31 +502,48 @@ namespace Rendering
             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR   // final layout
         };
 
+        VkAttachmentDescription depthAttachment{};
+        depthAttachment.format = findDepthFormat(physicalDevice);
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
         VkAttachmentReference colorAttachmentRef{};
         colorAttachmentRef.attachment = 0;
         colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
+        
+        VkAttachmentReference depthAttachmentRef{};
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
-        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.srcAccessMask = 0;
-        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
+        std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = 1;
-        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
+
 
         if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
             throw std::runtime_error("failed to create render pass!");
@@ -725,6 +743,29 @@ namespace Rendering
         }
     }
 
+    void createDepthResources()
+    {
+        VkFormat depthFormat = findDepthFormat(physicalDevice);
+        depthImage.width  = swapChainExtent.width;
+        depthImage.height = swapChainExtent.height;
+
+        VulkanMemory::createImage(
+            depthImage,
+            depthFormat, 
+            VK_IMAGE_TILING_OPTIMAL, 
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        depthImage.imageView = 
+            VulkanMemory::createImageView(
+            depthImage.image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+        VulkanMemory::transitionImageLayout(depthImage.image,
+            depthFormat, 
+            VK_IMAGE_LAYOUT_UNDEFINED, 
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    }
+    
     void recreateSwapChain() {
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
@@ -741,6 +782,7 @@ namespace Rendering
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
+        createDepthResources();
         createFramebuffers();
         createUniformBuffers();
         createDescriptorPool();
@@ -751,12 +793,6 @@ namespace Rendering
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     {
         framebufferResized = true;
-    }
-
-    
-    void createTexture()
-    {
-        texture = VulkanMemory::CreateTexture("../Assets/Textures/AtaTurk10.jpg");
     }
 
     void VulkanBackend::initVulkan(GLFWwindow* _window) {
@@ -774,13 +810,18 @@ namespace Rendering
         createRenderPass();
         createDescriptorSetLayout();
         createGraphicsPipeline();
-        createFramebuffers();
         createCommandPool();
         
         // init VulkanMemory
         VulkanMemory::Init(physicalDevice, device, instance, commandPool, graphicsQueue);
         
-        createTexture();
+        createDepthResources();
+        createFramebuffers();
+
+        const char* path = "../Assets/Textures/viking_room.png";
+
+        texture = VulkanMemory::CreateTexture(&path);
+
         generate_vertex_index_buffers();
         createUniformBuffers();
         createDescriptorPool();

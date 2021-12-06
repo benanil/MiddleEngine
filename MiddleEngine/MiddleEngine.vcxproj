@@ -126,7 +126,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;glfw3_mt.lib;glfw3dll.lib;vulkan-1.lib;VulkanMemoryAllocatord.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;glfw3_mt.lib;glfw3dll.lib;vulkan-1.lib;VulkanMemoryAllocatord.lib;assimp-vc142-mtd.lib;spdlogd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.198.0\Lib;</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -152,6 +152,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Graphics\VulkanMemory.cpp" />
+    <ClCompile Include="Graphics\Mesh.cpp" />
     <ClCompile Include="MiddleEngine.cpp" />
     <ClCompile Include="Graphics\Pipeline.cpp" />
     <ClCompile Include="Graphics\VulkanBackend.cpp" />
@@ -160,6 +161,7 @@
     <ClInclude Include="Common.hpp" />
     <ClInclude Include="Graphics\VulkanHelper.hpp" />
     <ClInclude Include="Graphics\VulkanMemory.hpp" />
+    <ClInclude Include="Graphics\Mesh.h" />
     <ClInclude Include="MiddleEngine.hpp" />
     <ClInclude Include="Graphics\Pipeline.hpp" />
     <ClInclude Include="Graphics\VulkanBackend.hpp" />
