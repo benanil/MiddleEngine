@@ -7,9 +7,8 @@
 
 namespace Rendering
 {
-	class Mesh
+	struct Mesh
 	{
-	public:
 		Vertex* vertices;
 		uint32_t* indices;
 		unsigned int vertexCount;
@@ -50,8 +49,28 @@ namespace Rendering
 			}
 		}
 	};
-	
-	static Mesh* LoadMesh(const std::string& path, unsigned short& meshCount)
+
+	struct MeshHandle
+	{
+		uint16_t size;
+		Mesh* meshes;
+
+		const Mesh& operator[](uint16_t i)
+		{
+			return meshes[i];
+		}
+
+		void Dispose()
+		{
+			for (uint16_t i = 0; i < size; i++)
+			{
+				delete meshes[i].indices;
+				delete meshes[i].vertices;
+			}
+		}
+	};
+
+	static MeshHandle LoadMesh(const std::string& path, unsigned short& meshCount)
 	{
 		Assimp::Importer importer;
 
@@ -66,14 +85,15 @@ namespace Rendering
 		meshCount = scene->mNumMeshes;
 		Mesh* result = (Mesh*)malloc(sizeof(Mesh) * scene->mNumMeshes);
 
-		for (unsigned short i = 0; i < scene->mNumMeshes; i++)
+		unsigned short i = 0;
+		for (; i < scene->mNumMeshes; i++)
 		{
 			result[i] = Mesh(scene->mMeshes[i], path);
 		}
 
 		importer.FreeScene();
 
-		return result;
+		return { i, result };
 	}
 
 }

@@ -31,27 +31,6 @@ namespace Rendering
         "VK_LAYER_KHRONOS_validation"
     };
     
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
-    {
-        if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            std::cout << "VKWarning: " << pCallbackData->messageIdNumber << std::endl << "name: " << pCallbackData->pMessageIdName << std::endl << pCallbackData->pMessage << std::endl;
-        }
-        else if (messageType & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-            std::cout << "VKError: " << pCallbackData->messageIdNumber << std::endl << "name: " << pCallbackData->pMessageIdName << std::endl << pCallbackData->pMessage << std::endl;
-        }
-        else if (messageType & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) { std::cout << "VKinfo: " << pCallbackData->pMessage << std::endl; }
-        return VK_FALSE;
-    }
-
-    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
-        createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        createInfo.pfnUserCallback = debugCallback;
-    }
-    //
-
     GLFWwindow* window;
 
     VkInstance instance;
@@ -92,6 +71,9 @@ namespace Rendering
 
     MDTexture texture;
     MDImage depthImage;
+    MDImage colorImage; // MSAA
+
+    MeshHandle meshes;
 
     std::vector<MDBuffer> uniformBuffers;
 
@@ -99,6 +81,7 @@ namespace Rendering
     static bool framebufferResized = false;
 
     const VkDevice& VulkanBackend::GetDevice() { return device; };
+    const VkPhysicalDevice& VulkanBackend::GetPhysicalDevice() { return physicalDevice; };
 
 
     struct UniformBufferObject {
@@ -244,7 +227,7 @@ namespace Rendering
         }
     }
     
-    Mesh* meshes;
+    
 
     void generate_vertex_index_buffers()
     {
@@ -254,11 +237,11 @@ namespace Rendering
         meshes = LoadMesh(MD_ASSETS_PATH("Models/viking room.obj"), meshCount);
         
         // create vertex buffers
-        VulkanMemory::CreateBuffer(meshes->vertices, (VkDeviceSize)meshes->vertexCount, sizeof(Vertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VulkanMemory::CreateBuffer(meshes[0].vertices, (VkDeviceSize)meshes[0].vertexCount, sizeof(Vertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             MD_DEFAULT_BUFFER_PROPERTIES, MD_MAP_BIT, vertexBuffer);
         
         // create index buffers
-        VulkanMemory::CreateBuffer(meshes->indices, (VkDeviceSize)meshes->indexCount, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+        VulkanMemory::CreateBuffer(meshes[0].indices, (VkDeviceSize)meshes[0].indexCount, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
             MD_DEFAULT_BUFFER_PROPERTIES, MD_MAP_BIT, indexBuffer);
     
         // create uniform buffers
@@ -401,9 +384,7 @@ namespace Rendering
             VkCommandBufferBeginInfo beginInfo{};
             beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-            if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-                throw std::runtime_error("failed to begin recording command buffer!");
-            }
+            vkBeginCommandBuffer(commandBuffers[i], &beginInfo);
 
             VkRenderPassBeginInfo renderPassInfo{
                 VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr,
@@ -423,18 +404,18 @@ namespace Rendering
 
                 VkBuffer vertexBuffers[] = { vertexBuffer.buffer };
                 VkDeviceSize offsets[] = { 0 };
-                vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+                
+                vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
 
+                // todo draw each mesh
+                vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-                vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-                vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(meshes->indexCount), 1, 0, 0, 0);
+                vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(meshes[0].indexCount), 1, 0, 0, 0);
 
             vkCmdEndRenderPass(commandBuffers[i]);
 
-            if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
-                throw std::runtime_error("failed to record command buffer!");
-            }
+            vkEndCommandBuffer(commandBuffers[i]);
         }
     }
 
@@ -456,9 +437,10 @@ namespace Rendering
 
         for (size_t i = 0; i < swapChainImageViews.size(); i++)
         {
-            std::array<VkImageView, 2> attachments = {
-                swapChainImageViews[i],
-                depthImage.imageView
+            std::array<VkImageView, 3> attachments = {
+                colorImage.imageView,
+                depthImage.imageView,
+                swapChainImageViews[i]
             };
 
             VkFramebufferCreateInfo framebufferInfo{};
@@ -493,18 +475,32 @@ namespace Rendering
     void createRenderPass() {
         VkAttachmentDescription colorAttachment {
             0, swapChainImageFormat,          // flags & swapChainImageFormat 
-            VK_SAMPLE_COUNT_1_BIT,            // samples
+            getMaxUsableSampleCount(),            // samples
             VK_ATTACHMENT_LOAD_OP_CLEAR,      // loadOp
             VK_ATTACHMENT_STORE_OP_STORE,     // storeOp
             VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // stencilLoadOp
             VK_ATTACHMENT_STORE_OP_DONT_CARE, // stencilStoreOp
             VK_IMAGE_LAYOUT_UNDEFINED,        // initialLayout
-            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR   // final layout
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL // final layout
         };
+
+        VkAttachmentDescription colorAttachmentResolve{};
+        colorAttachmentResolve.format = swapChainImageFormat;
+        colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference colorAttachmentResolveRef{};
+        colorAttachmentResolveRef.attachment = 2;
+        colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkAttachmentDescription depthAttachment{};
         depthAttachment.format = findDepthFormat(physicalDevice);
-        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAttachment.samples = getMaxUsableSampleCount();
         depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -525,6 +521,8 @@ namespace Rendering
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
         subpass.pDepthStencilAttachment = &depthAttachmentRef;
+        subpass.pResolveAttachments = &colorAttachmentResolveRef;
+
 
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -534,7 +532,8 @@ namespace Rendering
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-        std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+        std::array<VkAttachmentDescription, 3> attachments = { colorAttachment, depthAttachment, colorAttachmentResolve };
+ 
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -631,6 +630,7 @@ namespace Rendering
         }
 
         VkPhysicalDeviceFeatures deviceFeatures{};
+        deviceFeatures.sampleRateShading = VK_TRUE;
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -746,7 +746,7 @@ namespace Rendering
     void createDepthResources()
     {
         VkFormat depthFormat = findDepthFormat(physicalDevice);
-        depthImage.width  = swapChainExtent.width;
+        depthImage.width  = swapChainExtent.width ;
         depthImage.height = swapChainExtent.height;
 
         VulkanMemory::createImage(
@@ -754,18 +754,31 @@ namespace Rendering
             depthFormat, 
             VK_IMAGE_TILING_OPTIMAL, 
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 1U,
+            getMaxUsableSampleCount());
 
         depthImage.imageView = 
             VulkanMemory::createImageView(
             depthImage.image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-        VulkanMemory::transitionImageLayout(depthImage.image,
-            depthFormat, 
-            VK_IMAGE_LAYOUT_UNDEFINED, 
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     }
     
+    void createColorResources()
+    {
+        VkFormat colorFormat = swapChainImageFormat;
+
+        colorImage.width  = swapChainExtent.width;
+        colorImage.height = swapChainExtent.height;
+
+        VulkanMemory::createImage(
+            colorImage, 
+            colorFormat, 
+            VK_IMAGE_TILING_OPTIMAL, 
+            VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 1U, getMaxUsableSampleCount());
+
+        colorImage.imageView = VulkanMemory::createImageView(colorImage.image, colorFormat);
+    }
+
     void recreateSwapChain() {
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
@@ -782,6 +795,7 @@ namespace Rendering
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
+        createColorResources();
         createDepthResources();
         createFramebuffers();
         createUniformBuffers();
@@ -815,12 +829,13 @@ namespace Rendering
         // init VulkanMemory
         VulkanMemory::Init(physicalDevice, device, instance, commandPool, graphicsQueue);
         
+        createColorResources();
         createDepthResources();
         createFramebuffers();
 
         const char* path = "../Assets/Textures/viking_room.png";
 
-        texture = VulkanMemory::CreateTexture(&path);
+        texture = VulkanMemory::CreateTexture(&path, true);
 
         generate_vertex_index_buffers();
         createUniformBuffers();
@@ -839,6 +854,7 @@ namespace Rendering
         texture.Dispose(device);
         indexBuffer.Dispose(device);
         vertexBuffer.Dispose(device);
+        colorImage.Dispose(device);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);

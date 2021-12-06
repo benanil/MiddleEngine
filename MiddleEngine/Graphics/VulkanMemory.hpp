@@ -108,24 +108,29 @@ namespace VulkanMemory
     void endSingleTimeCommands(const VkCommandBuffer& commandBuffer);
 
     // TEXTURE
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels = 1 );
+    void copyBufferToImage(VkBuffer buffer, MDTexture& texture);
+    
     VkImageView createImageView(VkImage image, VkFormat format, 
-        VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT);
+        VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+        uint32_t mipLevels = 1);
 
     VkImageView createImageView(VkDevice _device, VkImage image, VkFormat format,
-        VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT);
-    
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-    void copyBufferToImage(VkBuffer buffer, MDTexture& texture);
+        VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, 
+        uint32_t mipLevels = 1);
     
     void createImage(
         MDImage& mdImage,
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties);
+        VkMemoryPropertyFlags properties,
+        uint32_t mipLevels = 1,
+        VkSampleCountFlagBits numSample = VK_SAMPLE_COUNT_1_BIT);
 
     MDTexture CreateTexture(
         const char** filePath,
+        bool createMipmap = true,
         VkFilter minFilter = VK_FILTER_LINEAR,
         VkFilter magFilter = VK_FILTER_LINEAR,
         VkSamplerAddressMode addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,

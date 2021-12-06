@@ -16,5 +16,6 @@ namespace Rendering
         static void drawFrame();
         static void cleanup();
         static const VkDevice& GetDevice();
+        static const VkPhysicalDevice& GetPhysicalDevice();
     };
 }
