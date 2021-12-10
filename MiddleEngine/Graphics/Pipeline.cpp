@@ -4,7 +4,7 @@
 #include "VulkanMemory.hpp"
 #include "VulkanHelper.hpp"
 
-namespace Rendering
+namespace MiddleEngine
 {
 
     static std::vector<char> readFile(const std::string& filename) {
@@ -168,9 +168,9 @@ namespace Rendering
             VK_NULL_HANDLE // basePipelineHandle
         };
 
-        if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
-            throw std::runtime_error("GraphicsPipelines creation failed");
-        }
+        VK_CHECK_RESULT(
+            vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline)
+        )
 
         vkDestroyShaderModule(device, fragShaderModule, nullptr);
         vkDestroyShaderModule(device, vertShaderModule, nullptr);

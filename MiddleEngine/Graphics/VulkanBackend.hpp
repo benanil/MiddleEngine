@@ -2,20 +2,20 @@
 #define GLFW_INCLUDE_VULKAN
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
-
-#include <iostream>
-#include <optional>
 #include <algorithm>
+#include <glm/glm.hpp>
 
-namespace Rendering
+#define MD_MAX_MESH_RENDER 2048UI16
+
+
+namespace MiddleEngine
 {
-    class VulkanBackend
+    namespace VulkanBackend
     {
-    public:
-        static void initVulkan(GLFWwindow* _window);
-        static void drawFrame();
-        static void cleanup();
-        static const VkDevice& GetDevice();
-        static const VkPhysicalDevice& GetPhysicalDevice();
+        void initVulkan(GLFWwindow* _window);
+        void drawFrame();
+        void cleanup();
+        const VkDevice& GetDevice();
+        const VkPhysicalDevice& GetPhysicalDevice();
     };
 }

@@ -2,7 +2,7 @@
 #include "VulkanBackend.hpp"
 #include "../Common.hpp"
 
-namespace Rendering
+namespace MiddleEngine
 {
     namespace Pipeline
     {

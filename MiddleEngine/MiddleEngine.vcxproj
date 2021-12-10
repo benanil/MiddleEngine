@@ -151,17 +151,42 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ECS\Component.cpp" />
+    <ClCompile Include="ECS\ECS.cpp" />
+    <ClCompile Include="ECS\Scene.cpp" />
+    <ClCompile Include="ECS\SceneManager.cpp" />
+    <ClCompile Include="ECS\Transform.cpp" />
+    <ClCompile Include="Graphics\SwapChain.cpp" />
     <ClCompile Include="Graphics\VulkanMemory.cpp" />
     <ClCompile Include="Graphics\Mesh.cpp" />
+    <ClCompile Include="Main\AssetManager.cpp" />
+    <ClCompile Include="Main\Device.cpp" />
+    <ClCompile Include="Main\Event.cpp" />
+    <ClCompile Include="Main\Helper.cpp" />
+    <ClCompile Include="Main\Input.cpp" />
+    <ClCompile Include="Main\Time.cpp" />
     <ClCompile Include="MiddleEngine.cpp" />
     <ClCompile Include="Graphics\Pipeline.cpp" />
     <ClCompile Include="Graphics\VulkanBackend.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.hpp" />
+    <ClInclude Include="ECS\Component.hpp" />
+    <ClInclude Include="ECS\ECS.hpp" />
+    <ClInclude Include="ECS\Entity.hpp" />
+    <ClInclude Include="ECS\Scene.hpp" />
+    <ClInclude Include="ECS\Transform.hpp" />
+    <ClInclude Include="Graphics\SwapChain.hpp" />
     <ClInclude Include="Graphics\VulkanHelper.hpp" />
+    <ClInclude Include="Graphics\VulkanInitializers.hpp" />
     <ClInclude Include="Graphics\VulkanMemory.hpp" />
-    <ClInclude Include="Graphics\Mesh.h" />
+    <ClInclude Include="Graphics\Mesh.hpp" />
+    <ClInclude Include="Main\AssetManager.hpp" />
+    <ClInclude Include="Main\Device.hpp" />
+    <ClInclude Include="Main\Event.hpp" />
+    <ClInclude Include="Main\Helper.hpp" />
+    <ClInclude Include="Main\Time.hpp" />
+    <ClInclude Include="Graphics\MeshRenderer.hpp" />
     <ClInclude Include="MiddleEngine.hpp" />
     <ClInclude Include="Graphics\Pipeline.hpp" />
     <ClInclude Include="Graphics\VulkanBackend.hpp" />

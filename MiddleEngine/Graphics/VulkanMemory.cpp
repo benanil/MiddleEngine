@@ -1,8 +1,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include "VulkanMemory.hpp"
+#include "vk_mem_alloc.h"
+#include "VulkanHelper.hpp"
 
-namespace VulkanMemory
+namespace MiddleEngine::VulkanMemory
 {
     // we will create image memory allaocation etc here
     // we will use like VMA library
@@ -78,8 +80,7 @@ namespace VulkanMemory
 
     void CreateBuffer(
         const void* vertices,
-        VkDeviceSize vertexCount,
-        VkDeviceSize stride,
+        VkDeviceSize bufferSize, // overall size of buffer.
         VkBufferUsageFlags usage,
         VkMemoryPropertyFlags properties,
         MDBufferCreateFlags flags,
@@ -87,14 +88,13 @@ namespace VulkanMemory
     {
 		VkBufferCreateInfo bufferInfo{};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = stride * vertexCount;
+		bufferInfo.size = bufferSize;
 		bufferInfo.usage = usage;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &result.buffer) != VK_SUCCESS)
-        {
-            throw std::runtime_error("vertex bufferCreation Failed !");
-        }
+        VK_CHECK_RESULT(
+            vkCreateBuffer(device, &bufferInfo, nullptr, &result.buffer)
+        )
 
         VkMemoryRequirements memRequirements{};
         vkGetBufferMemoryRequirements(device, result.buffer, &memRequirements);
@@ -104,21 +104,16 @@ namespace VulkanMemory
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-        VkResult allocResult = vkAllocateMemory(device, &allocInfo, nullptr, &result.memory);
-        if (allocResult != VK_SUCCESS)
-        {
-            std::cout << allocResult << std::endl;
-            throw std::runtime_error("failed to allocate vertex buffer memory!");
-        }
+        VK_CHECK_RESULT(
+            vkAllocateMemory(device, &allocInfo, nullptr, &result.memory)
+        )
 
         vkBindBufferMemory(device, result.buffer, result.memory, 0);
         
         if (flags & MD_MAP_BIT)
         {
-            std::cout << "mapping" << std::endl;
-            void* data;
-            vkMapMemory(device, result.memory, 0, bufferInfo.size, 0, &data);
-            std::memcpy(data, vertices, (size_t)bufferInfo.size);
+            vkMapMemory(device, result.memory, 0, bufferInfo.size, 0, &result.mapped);
+            std::memcpy(result.mapped, vertices, (size_t)bufferInfo.size);
             vkUnmapMemory(device, result.memory);
         }
     }
@@ -168,7 +163,6 @@ namespace VulkanMemory
     }
 
     // TEXTURE
-
     void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
         // Check if image format supports linear blitting
         VkFormatProperties formatProperties;
@@ -325,7 +319,6 @@ namespace VulkanMemory
     void copyBufferToImage(VkBuffer buffer, MDTexture& texture) 
     {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
