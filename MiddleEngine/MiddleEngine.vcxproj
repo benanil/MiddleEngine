@@ -126,7 +126,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;glfw3_mt.lib;glfw3dll.lib;vulkan-1.lib;VulkanMemoryAllocatord.lib;assimp-vc142-mtd.lib;spdlogd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;glfw3_mt.lib;glfw3dll.lib;vulkan-1.lib;VulkanMemoryAllocatord.lib;assimp-vc142-mtd.lib;spdlogd.lib;ImGui.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.198.0\Lib;</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -156,9 +156,20 @@
     <ClCompile Include="ECS\Scene.cpp" />
     <ClCompile Include="ECS\SceneManager.cpp" />
     <ClCompile Include="ECS\Transform.cpp" />
+    <ClCompile Include="Graphics\MDImGui.cpp" />
     <ClCompile Include="Graphics\SwapChain.cpp" />
+    <ClCompile Include="Graphics\VulkanBuffer.cpp" />
+    <ClCompile Include="Graphics\VulkanDevice.cpp" />
     <ClCompile Include="Graphics\VulkanMemory.cpp" />
     <ClCompile Include="Graphics\Mesh.cpp" />
+    <ClCompile Include="Imgui\imgui.cpp" />
+    <ClCompile Include="Imgui\imgui_demo.cpp" />
+    <ClCompile Include="Imgui\imgui_draw.cpp" />
+    <ClCompile Include="Imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="Imgui\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="Imgui\imgui_stdlib.cpp" />
+    <ClCompile Include="Imgui\imgui_tables.cpp" />
+    <ClCompile Include="Imgui\imgui_widgets.cpp" />
     <ClCompile Include="Main\AssetManager.cpp" />
     <ClCompile Include="Main\Device.cpp" />
     <ClCompile Include="Main\Event.cpp" />
@@ -176,11 +187,22 @@
     <ClInclude Include="ECS\Entity.hpp" />
     <ClInclude Include="ECS\Scene.hpp" />
     <ClInclude Include="ECS\Transform.hpp" />
+    <ClInclude Include="Graphics\MDDevice.hpp" />
+    <ClInclude Include="Graphics\MDImGui.hpp" />
     <ClInclude Include="Graphics\SwapChain.hpp" />
     <ClInclude Include="Graphics\VulkanHelper.hpp" />
     <ClInclude Include="Graphics\VulkanInitializers.hpp" />
     <ClInclude Include="Graphics\VulkanMemory.hpp" />
     <ClInclude Include="Graphics\Mesh.hpp" />
+    <ClInclude Include="Imgui\imconfig.h" />
+    <ClInclude Include="Imgui\imgui.h" />
+    <ClInclude Include="Imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="Imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="Imgui\imgui_internal.h" />
+    <ClInclude Include="Imgui\imgui_stdlib.h" />
+    <ClInclude Include="Imgui\imstb_rectpack.h" />
+    <ClInclude Include="Imgui\imstb_textedit.h" />
+    <ClInclude Include="Imgui\imstb_truetype.h" />
     <ClInclude Include="Main\AssetManager.hpp" />
     <ClInclude Include="Main\Device.hpp" />
     <ClInclude Include="Main\Event.hpp" />
@@ -194,6 +216,7 @@
   <ItemGroup>
     <None Include="..\Assets\Shaders\first.frag" />
     <None Include="..\Assets\Shaders\first.vert" />
+    <None Include="Graphics\VulkanBuffer.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

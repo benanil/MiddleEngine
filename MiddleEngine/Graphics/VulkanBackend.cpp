@@ -6,6 +6,9 @@
 #include "Graphics/VulkanMemory.hpp"
 #include "VulkanHelper.hpp"
 #include "Mesh.hpp"
+// #include "../Imgui/imgui.h"
+// #include "../Imgui/imgui_impl_glfw.h"
+// #include "MDImGui.hpp"
 
 #include <chrono>
 
@@ -71,6 +74,8 @@ namespace VulkanBackend
     MDMesh meshes;
 
     std::vector<MDBuffer> uniformBuffers;
+
+    // MDDevice mdDevice;
 
     // resizing
     static bool framebufferResized = false;
@@ -216,7 +221,7 @@ namespace VulkanBackend
         uniformBuffers.resize(swapChainImages.size());
         for (size_t i = 0; i < swapChainImages.size(); i++)
         {
-            VulkanMemory::CreateBuffer(malloc(sizeof(UniformBufferObject)), 
+            VulkanMemory::CreateBuffer(malloc(sizeof(UniformBufferObject)),
                 sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 MD_DEFAULT_BUFFER_PROPERTIES, MD_BUFFER_NONE_BIT, uniformBuffers[i]);
         }
@@ -227,7 +232,7 @@ namespace VulkanBackend
         spdlog::info("is mesh exist: {0}", std::filesystem::exists(MD_ASSETS_PATH("Models/map.fbx")));
 
         meshes = MeshLoader::LoadMesh(MD_ASSETS_PATH("Models/map.fbx"));
-        
+
         // create uniform buffers
         createUniformBuffers();
     }
@@ -301,6 +306,8 @@ namespace VulkanBackend
         }
 
         updateUniformBuffer(imageIndex);
+        // MDImGui::newFrame(true);
+        // MDImGui::updateBuffers();
 
         imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
@@ -360,11 +367,14 @@ namespace VulkanBackend
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)commandBuffers.capacity();
 
-        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate command buffers!");
-        }
+        VK_CHECK_RESULT(
+            vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data())
+        )
 
-        for (size_t i = 0; i < commandBuffers.size(); i++) {
+        // MDImGui::newFrame(true);
+        // MDImGui::updateBuffers();
+
+        for (uint16_t i = 0; i < commandBuffers.size(); i++) {
             VkCommandBufferBeginInfo beginInfo{};
             beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -387,22 +397,22 @@ namespace VulkanBackend
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-            
+
             for (uint16_t j = 0; j < meshes.submeshSize; j++)
             {
                 const SubMesh& submesh = meshes[j];
                 VkBuffer vertexBuffers[] = { submesh.vertexBuffer.buffer };
                 VkDeviceSize offsets[] = { 0 };
 
-                // todo draw each mesh
                 vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer(commandBuffers[i], submesh.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                 vkCmdDrawIndexed(commandBuffers[i], submesh.indexCount, 1, 0, 0, 0);
             }
 
-            vkCmdEndRenderPass(commandBuffers[i]);
+            // MDImGui::drawFrame(commandBuffers[i]);
 
+            vkCmdEndRenderPass(commandBuffers[i]);
             vkEndCommandBuffer(commandBuffers[i]);
         }
     }
@@ -450,8 +460,8 @@ namespace VulkanBackend
 
         Pipeline::CreateGraphicsPipeline(
             swapChainExtent,
-            "Shaders/vert.spv",
-            "Shaders/frag.spv",
+            "Shaders/firstVert.spv", // vertex path
+            "Shaders/firstFrag.spv", // frag path
             Vertex::getBindingDescription().data(),
             Vertex::getAttributeDescriptions(),
             descriptorSetLayout,
@@ -531,10 +541,9 @@ namespace VulkanBackend
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
 
-
-        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create render pass!");
-        }
+        VK_CHECK_RESULT(
+            vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass)
+        )
     }
 
     void createImageViews()
@@ -723,6 +732,10 @@ namespace VulkanBackend
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     {
+        // Update imGui
+        // ImGuiIO& io = ImGui::GetIO();
+        // io.DisplaySize = ImVec2((float)width, (float)height);
+
         framebufferResized = true;
     }
 
@@ -733,10 +746,11 @@ namespace VulkanBackend
 
         createInstance(instance);
         setupDebugMessenger();
-        
-        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create window surface!");
-        }
+
+        VK_CHECK_RESULT(
+            glfwCreateWindowSurface(instance, window, nullptr, &surface)
+        )
+
         pickPhysicalDevice(instance, surface, physicalDevice);
         createLogicalDevice();
         createSwapChain();
@@ -749,8 +763,16 @@ namespace VulkanBackend
         // init VulkanMemory
         VulkanMemory::Init(physicalDevice, device, instance, commandPool, graphicsQueue);
 
+        // Setup Dear ImGui context
+        // mdDevice.logicalDevice = device;
+        // mdDevice.physicalDevice = physicalDevice;
+        // 
+        // MDImGui::init(&mdDevice, swapChainExtent.width, swapChainExtent.height);
+        // ImGui_ImplGlfw_InitForVulkan(window, true);
+        // MDImGui::initResources(renderPass, graphicsQueue);
+
         createColorResources();
-        createDepthResources();
+        createDepthResources(); 
         createFramebuffers();
 
         const char* path = "../Assets/Textures/map_Base_Colorenyeni.png";
@@ -769,6 +791,9 @@ namespace VulkanBackend
         vkDeviceWaitIdle(device);
 
         cleanupSwapChain();
+
+        // ImGui_ImplGlfw_Shutdown();
+        // MDImGui::Clean();
 
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
         texture.Dispose(device);

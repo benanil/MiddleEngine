@@ -8,7 +8,7 @@ MD_NAMESPACE_START
 typedef enum MDBufferCreateFlagBits
 {
     MD_BUFFER_NONE_BIT = 0x00000000,
-    MD_MAP_BIT  = 0x00000001,
+    MD_MAP_BIT = 0x00000001,
     MD_IMAGE_BIT = 0x00000002
 } MDBufferCreateFlagBits;
 typedef VkFlags MDBufferCreateFlags;
@@ -18,7 +18,7 @@ struct MDBuffer
     VkBuffer buffer;
     VkDeviceMemory memory;
     void* mapped = nullptr;
-    
+
     void Flush(size_t size) const
     {
         VkMappedMemoryRange memoryRange = vks::initializers::mappedMemoryRange();
@@ -40,7 +40,7 @@ struct MDImage
     VkImageView imageView;
     VkDeviceMemory memory;
     uint32_t width, height;
-    
+
     void Dispose(const VkDevice& device)
     {
         vkDestroyImage(device, image, nullptr);
@@ -70,9 +70,9 @@ namespace VulkanMemory
 {
 
     void Init(
-        const VkPhysicalDevice& _physicalDevice, 
+        const VkPhysicalDevice& _physicalDevice,
         const VkDevice& _device,
-        const VkInstance& _instance, 
+        const VkInstance& _instance,
         const VkCommandPool& commandPool,
         const VkQueue& _graphicsQueue);
 
@@ -80,15 +80,40 @@ namespace VulkanMemory
     void endSingleTimeCommands(const VkCommandBuffer& commandBuffer);
 
     // TEXTURE
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels = 1 );
+    void setImageLayout( // from Sascha Williams
+        VkCommandBuffer cmdbuffer,
+        VkImage image,
+        VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout,
+        VkImageSubresourceRange subresourceRange,
+        VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask);
+
+    void setImageLayout(
+        VkCommandBuffer cmdbuffer,
+        VkImage image,
+        VkImageAspectFlags aspectMask,
+        VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout,
+        VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask);
+
+    void transitionImageLayout(
+        VkImage image, 
+        VkFormat format, 
+        VkImageLayout oldLayout, 
+        VkImageLayout newLayout, 
+        uint32_t mipLevels = 1);
     void copyBufferToImage(VkBuffer buffer, MDTexture& texture);
 
-    VkImageView createImageView(VkImage image, VkFormat format, 
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+    VkImageView createImageView(VkImage image, VkFormat format,
         VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
         uint32_t mipLevels = 1);
 
     VkImageView createImageView(VkDevice _device, VkImage image, VkFormat format,
-        VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, 
+        VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
         uint32_t mipLevels = 1);
 
     void createImage(
@@ -112,10 +137,10 @@ namespace VulkanMemory
     void copyBuffer(const MDBuffer& srcBuffer, const MDBuffer& dstBuffer, VkDeviceSize size);
 
     void CreateBuffer(
-        const void* vertices, 
+        const void* vertices,
         VkDeviceSize bufferSize,
-        VkBufferUsageFlags usage, 
-        VkMemoryPropertyFlags properties, 
+        VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags properties,
         MDBufferCreateFlags flags,
         MDBuffer& result);
 
@@ -149,4 +174,3 @@ namespace VulkanMemory
 }
 
 MD_NAMESPACE_END
-

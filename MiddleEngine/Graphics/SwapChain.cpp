@@ -120,7 +120,7 @@ void SwapChain::CleanUp(const VkInstance& instance)
     }
     vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
- 
+
 void SwapChain::Create()
 {
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
@@ -170,7 +170,7 @@ void SwapChain::Create()
         vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain)
     )
 
-    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
     images.reserve(imageCount);
 
     vkGetSwapchainImagesKHR(device, swapChain, &imageCount, images.data());
@@ -194,7 +194,7 @@ SwapChain::SwapChain(
     surface(_surface),
     window(_window)
 {
-    
+
 
 }
 

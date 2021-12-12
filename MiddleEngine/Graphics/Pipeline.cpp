@@ -33,15 +33,30 @@ namespace MiddleEngine
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         createInfo.codeSize = code.size();
         createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-    
+
         VkShaderModule shaderModule;
         if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
             throw std::runtime_error("failed to create shader module!");
         }
-    
+
         return shaderModule;
     }
 
+
+    VkShaderModule Pipeline::CreateShaderModule(const uint32_t* binaryCode, const VkDevice& device)
+    {
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = sizeof(binaryCode);
+        createInfo.pCode = binaryCode;
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        return shaderModule;
+    }
     void Pipeline::CreateGraphicsPipeline(
         const VkExtent2D& swapchainExtent,
         const char* vertexPath, const char* fragmentPath,
@@ -51,11 +66,11 @@ namespace MiddleEngine
         const VkRenderPass& renderPass,
         VkPipelineLayout& pipelineLayout,
         VkPipeline& graphicsPipeline
-        ) {
+    ) {
 
         const VkDevice& device = VulkanBackend::GetDevice();
 
-        VkShaderModule vertShaderModule = CreateShaderModule(MD_ASSETS_PATH(vertexPath)  , device);
+        VkShaderModule vertShaderModule = CreateShaderModule(MD_ASSETS_PATH(vertexPath), device);
         VkShaderModule fragShaderModule = CreateShaderModule(MD_ASSETS_PATH(fragmentPath), device);
 
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{
@@ -110,7 +125,7 @@ namespace MiddleEngine
             VK_FALSE, // depthBiasEnable
             0, 0, 0, 1
         };
-        
+
         VkPipelineMultisampleStateCreateInfo multisampling{};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         multisampling.sampleShadingEnable = VK_TRUE;
@@ -172,7 +187,7 @@ namespace MiddleEngine
             vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline)
         )
 
-        vkDestroyShaderModule(device, fragShaderModule, nullptr);
+            vkDestroyShaderModule(device, fragShaderModule, nullptr);
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 }

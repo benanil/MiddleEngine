@@ -37,12 +37,12 @@ class SwapChain
 public:
     VkExtent2D extent;
     VkFormat imageFormat;
-    
+
     SwapChain(
-        VkDevice _device, 
-        VkPhysicalDevice _physicalDevice, 
+        VkDevice _device,
+        VkPhysicalDevice _physicalDevice,
         VkSurfaceKHR _surface,
-        GLFWwindow* _window) ;
+        GLFWwindow* _window);
 
     void CreateFramebuffers(
         const MDImage& depthImage,

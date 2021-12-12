@@ -42,7 +42,6 @@ static void alignedFree(void* data)
 
 MD_NAMESPACE_START
 
-
 static std::vector<const char*> getRequiredExtensions()
 {
     uint32_t glfwExtensionCount = 0;
@@ -289,11 +288,3 @@ static VkSampleCountFlagBits getMaxUsableSampleCount() {
 }
 
 MD_NAMESPACE_END
-
-
-
-
-
-
-
-

@@ -7,7 +7,8 @@ namespace MiddleEngine
     namespace Pipeline
     {
         VkShaderModule CreateShaderModule(const std::string& path, const VkDevice& device);
-    
+        VkShaderModule CreateShaderModule(const uint32_t* binaryCode, const VkDevice& device);
+
         /// <summary> creates vertex-fragment pipeline </summary>
         /// <param name="vertexBindingDescriptions"> Vertex::getBindingDescription </param>
         /// <param name="attributeDescriptions"> Vertex::getattributeDescriptions </param>

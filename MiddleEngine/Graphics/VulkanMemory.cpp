@@ -16,8 +16,8 @@ namespace MiddleEngine::VulkanMemory
     VkQueue graphicsQueue;
 
     void Init(
-        const VkPhysicalDevice& _physicalDevice,  const VkDevice& _device,  
-        const VkInstance& _instance,              const VkCommandPool& _commandPool,
+        const VkPhysicalDevice& _physicalDevice, const VkDevice& _device,
+        const VkInstance& _instance, const VkCommandPool& _commandPool,
         const VkQueue& _graphicsQueue)
     {
         physicalDevice = _physicalDevice;
@@ -26,7 +26,7 @@ namespace MiddleEngine::VulkanMemory
         graphicsQueue = _graphicsQueue;
         commandPool = _commandPool;
     }
-    
+
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
     {
         VkPhysicalDeviceMemoryProperties memProperties{};
@@ -44,17 +44,12 @@ namespace MiddleEngine::VulkanMemory
     }
 
     VkCommandBuffer beginSingleTimeCommands() {
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = commandPool;
-        allocInfo.commandBufferCount = 1;
+        VkCommandBufferAllocateInfo allocInfo = vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 
         VkCommandBuffer commandBuffer;
         vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
 
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        VkCommandBufferBeginInfo beginInfo = vks::initializers::commandBufferBeginInfo();
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
         vkBeginCommandBuffer(commandBuffer, &beginInfo);
@@ -86,17 +81,17 @@ namespace MiddleEngine::VulkanMemory
         MDBufferCreateFlags flags,
         MDBuffer& result)
     {
-		VkBufferCreateInfo bufferInfo{};
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = bufferSize;
-		bufferInfo.usage = usage;
-		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = bufferSize;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
         VK_CHECK_RESULT(
             vkCreateBuffer(device, &bufferInfo, nullptr, &result.buffer)
         )
 
-        VkMemoryRequirements memRequirements{};
+            VkMemoryRequirements memRequirements {};
         vkGetBufferMemoryRequirements(device, result.buffer, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
@@ -108,8 +103,8 @@ namespace MiddleEngine::VulkanMemory
             vkAllocateMemory(device, &allocInfo, nullptr, &result.memory)
         )
 
-        vkBindBufferMemory(device, result.buffer, result.memory, 0);
-        
+            vkBindBufferMemory(device, result.buffer, result.memory, 0);
+
         if (flags & MD_MAP_BIT)
         {
             vkMapMemory(device, result.memory, 0, bufferInfo.size, 0, &result.mapped);
@@ -118,8 +113,8 @@ namespace MiddleEngine::VulkanMemory
         }
     }
 
-    
-    void copyBuffer(const MDBuffer& srcBuffer, const MDBuffer& dstBuffer, VkDeviceSize size) 
+
+    void copyBuffer(const MDBuffer& srcBuffer, const MDBuffer& dstBuffer, VkDeviceSize size)
     {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -129,13 +124,13 @@ namespace MiddleEngine::VulkanMemory
 
         endSingleTimeCommands(commandBuffer);
     }
-    
+
     void createBufferStage(
-        VkDeviceSize size, 
+        VkDeviceSize size,
         VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties, 
-        VkBuffer& buffer, 
-        VkDeviceMemory& bufferMemory) 
+        VkMemoryPropertyFlags properties,
+        VkBuffer& buffer,
+        VkDeviceMemory& bufferMemory)
     {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -249,7 +244,147 @@ namespace MiddleEngine::VulkanMemory
         endSingleTimeCommands(commandBuffer);
     }
 
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
+    void setImageLayout(
+        VkCommandBuffer cmdbuffer,
+        VkImage image,
+        VkImageAspectFlags aspectMask,
+        VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout,
+        VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask)
+    {
+        VkImageSubresourceRange subresourceRange = {};
+        subresourceRange.aspectMask = aspectMask;
+        subresourceRange.baseMipLevel = 0;
+        subresourceRange.levelCount = 1;
+        subresourceRange.layerCount = 1;
+        setImageLayout(cmdbuffer, image, oldImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
+    }
+
+    void setImageLayout(
+        VkCommandBuffer cmdbuffer,
+        VkImage image,
+        VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout,
+        VkImageSubresourceRange subresourceRange,
+        VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask)
+    {
+        // Create an image barrier object
+        VkImageMemoryBarrier imageMemoryBarrier = vks::initializers::imageMemoryBarrier();
+        imageMemoryBarrier.oldLayout = oldImageLayout;
+        imageMemoryBarrier.newLayout = newImageLayout;
+        imageMemoryBarrier.image = image;
+        imageMemoryBarrier.subresourceRange = subresourceRange;
+
+        // Source layouts (old)
+        // Source access mask controls actions that have to be finished on the old layout
+        // before it will be transitioned to the new layout
+        switch (oldImageLayout)
+        {
+        case VK_IMAGE_LAYOUT_UNDEFINED:
+            // Image layout is undefined (or does not matter)
+            // Only valid as initial layout
+            // No flags required, listed only for completeness
+            imageMemoryBarrier.srcAccessMask = 0;
+            break;
+
+        case VK_IMAGE_LAYOUT_PREINITIALIZED:
+            // Image is preinitialized
+            // Only valid as initial layout for linear images, preserves memory contents
+            // Make sure host writes have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+            // Image is a color attachment
+            // Make sure any writes to the color buffer have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+            // Image is a depth/stencil attachment
+            // Make sure any writes to the depth/stencil buffer have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+            // Image is a transfer source
+            // Make sure any reads from the image have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+            // Image is a transfer destination
+            // Make sure any writes to the image have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+            // Image is read by a shader
+            // Make sure any shader reads from the image have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            break;
+        default:
+            // Other source layouts aren't handled (yet)
+            break;
+        }
+
+        // Target layouts (new)
+        // Destination access mask controls the dependency for the new image layout
+        switch (newImageLayout)
+        {
+        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+            // Image will be used as a transfer destination
+            // Make sure any writes to the image have been finished
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+            // Image will be used as a transfer source
+            // Make sure any reads from the image have been finished
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+            // Image will be used as a color attachment
+            // Make sure any writes to the color buffer have been finished
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+            // Image layout will be used as a depth/stencil attachment
+            // Make sure any writes to depth/stencil buffer have been finished
+            imageMemoryBarrier.dstAccessMask = imageMemoryBarrier.dstAccessMask | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+            // Image will be read in a shader (sampler, input attachment)
+            // Make sure any writes to the image have been finished
+            if (imageMemoryBarrier.srcAccessMask == 0)
+            {
+                imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+            }
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            break;
+        default:
+            // Other source layouts aren't handled (yet)
+            break;
+        }
+
+        // Put barrier inside setup command buffer
+        vkCmdPipelineBarrier(
+            cmdbuffer,
+            srcStageMask,
+            dstStageMask,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageMemoryBarrier);
+    }
+
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) 
+    {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
@@ -315,8 +450,8 @@ namespace MiddleEngine::VulkanMemory
 
         endSingleTimeCommands(commandBuffer);
     }
-    
-    void copyBufferToImage(VkBuffer buffer, MDTexture& texture) 
+
+    void copyBufferToImage(VkBuffer buffer, MDTexture& texture)
     {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -370,7 +505,7 @@ namespace MiddleEngine::VulkanMemory
 
         VkImageView imageView{};
         VkResult viewResult = vkCreateImageView(_device, &viewInfo, nullptr, &imageView);
-        
+
         if (viewResult != VK_SUCCESS) {
             throw std::runtime_error("failed to create texture image view!");
         }
@@ -379,12 +514,12 @@ namespace MiddleEngine::VulkanMemory
     }
 
     void createImage(
-        MDImage& mdImage, 
-        VkFormat format, 
-        VkImageTiling tiling, 
-        VkImageUsageFlags usage, 
+        MDImage& mdImage,
+        VkFormat format,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
         VkMemoryPropertyFlags properties,
-        uint32_t mipLevels ,
+        uint32_t mipLevels,
         VkSampleCountFlagBits numSample
     )
     {
@@ -424,10 +559,10 @@ namespace MiddleEngine::VulkanMemory
 
 
     void createImage(
-        MDTexture& texture, 
+        MDTexture& texture,
         VkFormat format,
-        VkImageTiling tiling, 
-        VkImageUsageFlags usage, 
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
         VkMemoryPropertyFlags properties,
         uint32_t mipLevels,
         VkSampleCountFlagBits numSample = VK_SAMPLE_COUNT_1_BIT)
@@ -475,11 +610,11 @@ namespace MiddleEngine::VulkanMemory
         VkSamplerAddressMode addressModeV)
     {
         MDTexture texture{};
-        
+
         int channels = 0;
 
         stbi_uc* pixels = stbi_load(*filePath, &texture.width, &texture.height, &channels, STBI_rgb_alpha);
-        
+
         if (!pixels) { throw std::runtime_error("stbi failed to load texture image!"); }
 
         VkBuffer stagingBuffer;
@@ -487,8 +622,8 @@ namespace MiddleEngine::VulkanMemory
 
         VkDeviceSize imageSize = (VkDeviceSize)texture.width * texture.height * 4;
 
-        createBufferStage(imageSize, 
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+        createBufferStage(imageSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             MD_DEFAULT_BUFFER_PROPERTIES, stagingBuffer, stagingBufferMemory);
 
         void* data;
@@ -502,13 +637,13 @@ namespace MiddleEngine::VulkanMemory
         {
             mipmapLevels = (uint32_t)std::floor(std::log2(std::max(texture.width, texture.height))) + 1;
         }
-        
+
         stbi_image_free(pixels);
 
         createImage(texture,
             VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mipmapLevels, VK_SAMPLE_COUNT_1_BIT);
 
         if (createMipMap)
@@ -519,12 +654,12 @@ namespace MiddleEngine::VulkanMemory
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipmapLevels);
         }
         else {
-            transitionImageLayout(texture.image, 
-                VK_FORMAT_R8G8B8A8_SRGB, 
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+            transitionImageLayout(texture.image,
+                VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mipmapLevels);
         }
-        
+
         copyBufferToImage(stagingBuffer, texture);
 
         if (createMipMap)
@@ -533,8 +668,8 @@ namespace MiddleEngine::VulkanMemory
         }
         else {
             transitionImageLayout(texture.image,
-                VK_FORMAT_R8G8B8A8_SRGB, 
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+                VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
@@ -554,7 +689,7 @@ namespace MiddleEngine::VulkanMemory
 
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-        
+
         samplerInfo.anisotropyEnable = VK_TRUE;
         samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 
@@ -568,7 +703,7 @@ namespace MiddleEngine::VulkanMemory
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         samplerInfo.mipLodBias = 0.0f;
         samplerInfo.minLod = 0;
-        
+
         if (createMipMap)
         {
             samplerInfo.maxLod = static_cast<float>(mipmapLevels);

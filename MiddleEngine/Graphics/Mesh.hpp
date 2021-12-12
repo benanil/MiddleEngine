@@ -131,7 +131,7 @@ namespace MiddleEngine
 			return submeshes[index];
 		}
 
-		void Dispose(const VkDevice& device)
+		void Dispose(const VkDevice& device) const 
 		{
 			for (size_t i = 0; i < submeshSize; i++)
 			{
